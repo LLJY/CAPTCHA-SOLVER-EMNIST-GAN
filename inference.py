@@ -59,7 +59,7 @@ def run_inference(base64_image):
     rois = []
     locs = []
     start = time.time()
-    model = load_model('aaaaa.h5')
+    model = load_model('aaaaav3.h5')
     # loop over the image pyramid
     scale = W / float(image.shape[1])
 
@@ -113,6 +113,7 @@ def run_inference(base64_image):
     # decode the predictions and initialize a dictionary which maps class
     # labels (keys) to any ROIs associated with that label (values)
     readable_predictions = []
+    labels = {}
     # loop through the predicted values
     for count, pred in enumerate(preds):
         # get the max result index and the confidence value from that
@@ -121,23 +122,46 @@ def run_inference(base64_image):
         # filter out the lousy predictions
         if max_confidence > 0.9:
             # add it to the list of readable predictions
+            L = labels.get(class_idx[max_result_idx], [])
+            L.append((locs[count], max_confidence))
+            labels[class_idx[max_result_idx]] = L
             readable_predictions.append((locs[count],class_idx[max_result_idx]))
     clone = image.copy()
     #print(readable_predictions)
-    # loop through the readable predictions to label them and perform non_max_suppression
-    for ((idx, (locs, img_class))) in enumerate(readable_predictions):
-        boxes = np.array([p[0] for p in readable_predictions[idx]])
-        proba = np.array([p[1] for p in readable_predictions[idx]])
+    for label in labels.keys():
+        clone = image.copy()
+        # extract the bounding boxes and associated prediction
+        # probabilities, then apply non-maxima suppression
+        boxes = np.array([p[0] for p in labels[label]])
+        proba = np.array([p[1] for p in labels[label]])
         boxes = non_max_suppression(boxes, proba)
-        (startX, startY, endX, endY) = locs
-        cv2.rectangle(clone, (startX, startY), (endX, endY),
-                      (0, 255, 0), 2)
-        y = startY - 10 if startY - 10 > 10 else startY + 10
-        cv2.putText(clone, img_class, (startX, y),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
-    cv2.imshow("Before", clone)
-    cv2.waitKey(0)
-    labels = {}
+
+        # loop over all bounding boxes that were kept after applying
+        # non-maxima suppression
+        for (startX, startY, endX, endY) in boxes:
+            # draw the bounding box and label on the image
+            cv2.rectangle(clone, (startX, startY), (endX, endY),
+                          (0, 255, 0), 2)
+            y = startY - 10 if startY - 10 > 10 else startY + 10
+            cv2.putText(clone, label, (startX, y),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
+
+        # show the output after apply non-maxima suppression
+        cv2.imshow("After", clone)
+        cv2.waitKey(0)
+    # # loop through the readable predictions to label them and perform non_max_suppression
+    # for ((idx, (locs, img_class))) in enumerate(readable_predictions):
+    #     boxes = np.array([p[0] for p in readable_predictions[idx]])
+    #     proba = np.array([p[1] for p in readable_predictions[idx]])
+    #     boxes = non_max_suppression(boxes, proba)
+    #     (startX, startY, endX, endY) = locs
+    #     cv2.rectangle(clone, (startX, startY), (endX, endY),
+    #                   (0, 255, 0), 2)
+    #     y = startY - 10 if startY - 10 > 10 else startY + 10
+    #     cv2.putText(clone, img_class, (startX, y),
+    #                 cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 255, 0), 2)
+    # cv2.imshow("Before", clone)
+    # cv2.waitKey(0)
 
 
 if __name__ == '__main__':
